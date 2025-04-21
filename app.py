@@ -82,6 +82,39 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    device_id = data.get('device_id')
+
+    if not all([email, password, device_id]):
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({"status": "error", "message": "Email already registered"}), 400
+
+    if User.query.filter_by(device_id=device_id).first():
+        return jsonify({"status": "error", "message": "Device ID already registered"}), 400
+
+    try:
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        user = User(
+            email=email,
+            device_id=device_id,
+            password=hashed_password,
+            is_stolen=False
+        )
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "User registered successfully"}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Registration error: {str(e)}")
+        return jsonify({"status": "error", "message": f"Registration failed: {str(e)}"}), 500
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
